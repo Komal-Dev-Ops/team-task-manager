@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Project – Team Task Manager</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+  <nav class="navbar navbar-dark bg-dark px-4">
+    <a class="navbar-brand" href="/dashboard">TaskManager</a>
+    <div class="d-flex gap-3 align-items-center">
+      <a href="/projects" class="text-white text-decoration-none">Projects</a>
+      <a href="/tasks" class="text-white text-decoration-none">My Tasks</a>
+      <span class="text-secondary" id="userName"></span>
+      <button class="btn btn-outline-light btn-sm" onclick="logout()">Logout</button>
+    </div>
+  </nav>
+
+  <div class="container py-4">
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <a href="/projects" class="text-muted text-decoration-none">← Projects</a>
+    </div>
+    <div id="pageError" class="alert alert-danger d-none mb-3"></div>
+    <h4 id="projectName" class="mb-0">Loading…</h4>
+    <p id="projectDesc" class="text-muted mb-3"></p>
+
+    <ul class="nav nav-tabs mb-4" id="tabs">
+      <li class="nav-item"><a class="nav-link active" href="#" onclick="showTab('tasks');return false">Tasks</a></li>
+      <li class="nav-item"><a class="nav-link" href="#" id="membersTabLink" onclick="showTab('members');return false">Members</a></li>
+    </ul>
+
+    <!-- Tasks Tab -->
+    <div id="tasksTab">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <span class="text-muted small" id="taskCount"></span>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-secondary btn-sm d-none" id="manageMembersBtn" onclick="showTab('members')">👥 Members</button>
+          <button class="btn btn-dark btn-sm d-none" id="addTaskBtn" data-bs-toggle="modal" data-bs-target="#taskModal">+ Add Task</button>
+        </div>
+      </div>
+      <div id="tasksTable">
+        <p class="text-muted">Loading tasks…</p>
+      </div>
+    </div>
+
+    <!-- Members Tab -->
+    <div id="membersTab" class="d-none">
+      <div class="d-flex justify-content-end mb-3">
+        <button class="btn btn-dark btn-sm d-none" id="addMemberBtn" data-bs-toggle="modal" data-bs-target="#memberModal">+ Add Member</button>
+      </div>
+      <table class="table table-hover">
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th></th></tr></thead>
+        <tbody id="membersBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Add Task Modal -->
+  <div class="modal fade" id="taskModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Add Task</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="taskModalError" class="alert alert-danger d-none"></div>
+          <div class="mb-3"><label class="form-label">Title *</label><input type="text" id="taskTitle" class="form-control"></div>
+          <div class="mb-3"><label class="form-label">Description</label><textarea id="taskDesc" class="form-control" rows="2"></textarea></div>
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label">Priority</label>
+              <select id="taskPriority" class="form-select">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Due Date</label>
+              <input type="date" id="taskDue" class="form-control">
+            </div>
+          </div>
+          <div class="mb-3 mt-2">
+            <label class="form-label">Assign To</label>
+            <select id="taskAssignee" class="form-select">
+              <option value="">Unassigned</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-dark" id="saveTaskBtn" onclick="saveTask()">Save Task</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Member Modal -->
+  <div class="modal fade" id="memberModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Add Member</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="memberModalError" class="alert alert-danger d-none"></div>
+          <div class="mb-3">
+            <label class="form-label">Search by Email</label>
+            <input type="email" id="memberSearch" class="form-control" placeholder="type email…" oninput="searchUsers()">
+            <div id="searchResults" class="list-group mt-2"></div>
+          </div>
+          <div class="mb-3" id="selectedUserBox" style="display:none">
+            <label class="form-label">Selected User</label>
+            <div id="selectedUserName" class="form-control bg-light"></div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Role</label>
+            <select id="memberRole" class="form-select">
+              <option value="member">Member</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-dark" id="addMemberSaveBtn" onclick="addMember()">Add Member</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/static/js/api.js"></script>
+  <script>
+    requireAuth();
+
+    const params = new URLSearchParams(location.search);
+    const projectId = params.get('id');
+    if (!projectId) window.location.href = '/projects';
+
+    let currentUser = null;
+    let isAdmin = false;
+    let projectMembers = [];
+    let selectedUserId = null;
+
+    function showTab(tab) {
+      document.getElementById('tasksTab').classList.toggle('d-none', tab !== 'tasks');
+      document.getElementById('membersTab').classList.toggle('d-none', tab !== 'members');
+      document.querySelectorAll('#tabs .nav-link').forEach((el, i) => {
+        el.classList.toggle('active', (tab === 'tasks' && i === 0) || (tab === 'members' && i === 1));
+      });
+    }
+
+    async function loadProject() {
+      try {
+        // Always fetch current user fresh from API to ensure correct ID
+        currentUser = await apiFetch('/auth/me');
+        document.getElementById('userName').textContent = currentUser.name;
+
+        const project = await apiFetch(`/projects/${projectId}`);
+        document.getElementById('projectName').textContent = project.name;
+        document.getElementById('projectDesc').textContent = project.description || '';
+        projectMembers = project.members;
+
+        const myMembership = project.members.find(m => String(m.user_id) === String(currentUser.id));
+        isAdmin = !!(myMembership && myMembership.role === 'admin');
+
+        if (isAdmin) {
+          document.getElementById('addTaskBtn').classList.remove('d-none');
+          document.getElementById('addMemberBtn').classList.remove('d-none');
+          document.getElementById('manageMembersBtn').classList.remove('d-none');
+          const sel = document.getElementById('taskAssignee');
+          project.members.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m.user_id; opt.textContent = m.name;
+            sel.appendChild(opt);
+          });
+        }
+
+        renderMembers(project.members);
+        await loadTasks();
+      } catch (err) {
+        console.error(err);
+        document.getElementById('projectName').textContent = 'Error loading project';
+        showError('pageError', err.message || 'Failed to load project. Please go back and try again.');
+      }
+    }
+
+    function renderMembers(members) {
+      document.getElementById('membersBody').innerHTML = members.map(m => `
+        <tr>
+          <td>${m.name}</td>
+          <td>${m.email}</td>
+          <td><span class="badge ${m.role === 'admin' ? 'bg-dark' : 'bg-secondary'}">${m.role}</span></td>
+          <td>${isAdmin && String(m.user_id) !== String(currentUser && currentUser.id)
+            ? `<button class="btn btn-outline-danger btn-sm" onclick="removeMember('${m.user_id}','${m.name}')">Remove</button>`
+            : ''}</td>
+        </tr>`).join('');
+    }
+
+    async function loadTasks() {
+      try {
+        const tasks = await apiFetch(`/projects/${projectId}/tasks/`);
+        document.getElementById('taskCount').textContent = `${tasks.length} task${tasks.length !== 1 ? 's' : ''}`;
+        if (!tasks.length) {
+          document.getElementById('tasksTable').innerHTML = '<p class="text-muted">No tasks yet.</p>';
+          return;
+        }
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('tasksTable').innerHTML = `
+          <table class="table table-hover">
+            <thead><tr><th>Title</th><th>Priority</th><th>Status</th><th>Due</th><th>Assigned To</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
+            <tbody>${tasks.map(t => {
+              const overdue = t.due_date && t.due_date < today && t.status !== 'done';
+              return `<tr class="${overdue ? 'overdue-row' : ''}">
+                <td>${t.title}${t.description ? `<br><small class="text-muted">${t.description}</small>` : ''}</td>
+                <td>${priorityBadge(t.priority)}</td>
+                <td>
+                  <select class="form-select form-select-sm" style="width:130px"
+                    onchange="updateStatus('${t.id}', this.value)"
+                    ${!isAdmin && String(t.assigned_to) !== String(currentUser && currentUser.id) ? 'disabled' : ''}>
+                    <option value="todo" ${t.status==='todo'?'selected':''}>To Do</option>
+                    <option value="in_progress" ${t.status==='in_progress'?'selected':''}>In Progress</option>
+                    <option value="done" ${t.status==='done'?'selected':''}>Done</option>
+                  </select>
+                </td>
+                <td>${t.due_date || '–'}</td>
+                <td>${t.assignee ? t.assignee.name : '<span class="text-muted">Unassigned</span>'}</td>
+                ${isAdmin ? `<td><button class="btn btn-outline-danger btn-sm" onclick="deleteTask('${t.id}')">Del</button></td>` : ''}
+              </tr>`;
+            }).join('')}</tbody>
+          </table>`;
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function updateStatus(taskId, status) {
+      try {
+        await apiFetch(`/projects/${projectId}/tasks/${taskId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status }),
+        });
+      } catch (err) {
+        alert(err.message);
+        loadTasks();
+      }
+    }
+
+    async function deleteTask(taskId) {
+      if (!confirm('Delete this task?')) return;
+      try {
+        await apiFetch(`/projects/${projectId}/tasks/${taskId}`, { method: 'DELETE' });
+        loadTasks();
+      } catch (err) { alert(err.message); }
+    }
+
+    async function saveTask() {
+      const title = document.getElementById('taskTitle').value.trim();
+      if (!title) { showError('taskModalError', 'Title is required'); return; }
+      hideError('taskModalError');
+      const btn = document.getElementById('saveTaskBtn');
+      btn.disabled = true;
+      try {
+        const assignee = document.getElementById('taskAssignee').value;
+        await apiFetch(`/projects/${projectId}/tasks/`, {
+          method: 'POST',
+          body: JSON.stringify({
+            title,
+            description: document.getElementById('taskDesc').value || null,
+            priority: document.getElementById('taskPriority').value,
+            due_date: document.getElementById('taskDue').value || null,
+            assigned_to: assignee || null,
+          }),
+        });
+        bootstrap.Modal.getInstance(document.getElementById('taskModal')).hide();
+        document.getElementById('taskTitle').value = '';
+        document.getElementById('taskDesc').value = '';
+        document.getElementById('taskDue').value = '';
+        loadTasks();
+      } catch (err) {
+        showError('taskModalError', err.message);
+      } finally { btn.disabled = false; }
+    }
+
+    let searchTimeout;
+    function searchUsers() {
+      clearTimeout(searchTimeout);
+      selectedUserId = null;
+      document.getElementById('selectedUserBox').style.display = 'none';
+      searchTimeout = setTimeout(async () => {
+        const q = document.getElementById('memberSearch').value.trim();
+        if (!q) { document.getElementById('searchResults').innerHTML = ''; return; }
+        try {
+          const users = await apiFetch(`/users/?q=${encodeURIComponent(q)}`);
+          document.getElementById('searchResults').innerHTML = users.map(u =>
+            `<a href="#" class="list-group-item list-group-item-action" onclick="selectUser('${u.id}','${u.name} (${u.email})');return false">
+              ${u.name} – ${u.email}
+            </a>`).join('') || '<div class="list-group-item text-muted">No users found</div>';
+        } catch {}
+      }, 300);
+    }
+
+    function selectUser(id, label) {
+      selectedUserId = id;
+      document.getElementById('searchResults').innerHTML = '';
+      document.getElementById('selectedUserName').textContent = label;
+      document.getElementById('selectedUserBox').style.display = 'block';
+    }
+
+    async function addMember() {
+      if (!selectedUserId) { showError('memberModalError', 'Please search and select a user'); return; }
+      hideError('memberModalError');
+      try {
+        await apiFetch(`/projects/${projectId}/members`, {
+          method: 'POST',
+          body: JSON.stringify({ user_id: selectedUserId, role: document.getElementById('memberRole').value }),
+        });
+        bootstrap.Modal.getInstance(document.getElementById('memberModal')).hide();
+        selectedUserId = null;
+        document.getElementById('memberSearch').value = '';
+        document.getElementById('selectedUserBox').style.display = 'none';
+        loadProject();
+      } catch (err) { showError('memberModalError', err.message); }
+    }
+
+    async function removeMember(userId, name) {
+      if (!confirm(`Remove ${name} from this project?`)) return;
+      try {
+        await apiFetch(`/projects/${projectId}/members/${userId}`, { method: 'DELETE' });
+        loadProject();
+      } catch (err) { alert(err.message); }
+    }
+
+    loadProject();
+  </script>
+</body>
+</html>

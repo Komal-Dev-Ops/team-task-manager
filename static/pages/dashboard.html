@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard – Team Task Manager</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+  <nav class="navbar navbar-dark bg-dark px-4">
+    <a class="navbar-brand" href="/dashboard">TaskManager</a>
+    <div class="d-flex gap-3 align-items-center">
+      <a href="/projects" class="text-white text-decoration-none">Projects</a>
+      <a href="/tasks" class="text-white text-decoration-none">My Tasks</a>
+      <span class="text-secondary" id="userName"></span>
+      <button class="btn btn-outline-light btn-sm" onclick="logout()">Logout</button>
+    </div>
+  </nav>
+
+  <div class="container py-4">
+    <h4 class="mb-4">Dashboard</h4>
+
+    <!-- Stat Cards -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="card stat-card text-center p-3">
+          <div class="display-6 text-dark" id="totalTasks">–</div>
+          <div class="text-muted small">Total Tasks</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card stat-card text-center p-3">
+          <div class="display-6 text-primary" id="inProgress">–</div>
+          <div class="text-muted small">In Progress</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card stat-card text-center p-3">
+          <div class="display-6 text-success" id="done">–</div>
+          <div class="text-muted small">Done</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card stat-card text-center p-3">
+          <div class="display-6 text-danger" id="overdue">–</div>
+          <div class="text-muted small">Overdue</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <!-- Tasks by Status -->
+      <div class="col-md-4">
+        <div class="card p-3">
+          <h6 class="mb-3">Tasks by Status</h6>
+          <table class="table table-sm">
+            <tbody id="statusTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tasks per User -->
+      <div class="col-md-4">
+        <div class="card p-3">
+          <h6 class="mb-3">Tasks per User</h6>
+          <table class="table table-sm">
+            <tbody id="perUserTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- My Tasks -->
+      <div class="col-md-4">
+        <div class="card p-3">
+          <h6 class="mb-3">My Open Tasks</h6>
+          <div id="myTasksList">
+            <p class="text-muted small">No open tasks assigned to you.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    requireAuth();
+    const user = getUser();
+    if (user) document.getElementById('userName').textContent = user.name;
+
+    async function loadDashboard() {
+      try {
+        const data = await apiFetch('/dashboard/');
+
+        document.getElementById('totalTasks').textContent = data.total_tasks;
+        document.getElementById('inProgress').textContent = data.by_status.in_progress || 0;
+        document.getElementById('done').textContent = data.by_status.done || 0;
+        document.getElementById('overdue').textContent = data.overdue_tasks;
+
+        const statusLabels = { todo: 'To Do', in_progress: 'In Progress', done: 'Done' };
+        document.getElementById('statusTable').innerHTML = Object.entries(data.by_status)
+          .map(([k, v]) => `<tr><td>${statusLabels[k] || k}</td><td class="text-end fw-bold">${v}</td></tr>`)
+          .join('');
+
+        document.getElementById('perUserTable').innerHTML = data.tasks_per_user.length
+          ? data.tasks_per_user.map(u => `<tr><td>${u.name}</td><td class="text-end fw-bold">${u.count}</td></tr>`).join('')
+          : '<tr><td class="text-muted">No assignments yet</td></tr>';
+
+        if (data.my_tasks.length) {
+          document.getElementById('myTasksList').innerHTML = data.my_tasks.map(t => `
+            <div class="border-bottom py-2">
+              <div class="fw-semibold small">${t.title}</div>
+              <div class="d-flex gap-1 mt-1">
+                ${statusBadge(t.status)}
+                ${priorityBadge(t.priority)}
+                ${t.due_date ? `<span class="badge bg-light text-dark border">${t.due_date}</span>` : ''}
+              </div>
+              <a href="/project-detail?id=${t.project_id}" class="text-muted" style="font-size:0.75rem">${t.project_name}</a>
+            </div>`).join('');
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My Tasks – Team Task Manager</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+  <nav class="navbar navbar-dark bg-dark px-4">
+    <a class="navbar-brand" href="/dashboard">TaskManager</a>
+    <div class="d-flex gap-3 align-items-center">
+      <a href="/dashboard" class="text-white text-decoration-none">Dashboard</a>
+      <a href="/projects" class="text-white text-decoration-none">Projects</a>
+      <span class="text-secondary" id="userName"></span>
+      <button class="btn btn-outline-light btn-sm" onclick="logout()">Logout</button>
+    </div>
+  </nav>
+
+  <div class="container py-4">
+    <h4 class="mb-4">My Tasks</h4>
+    <div id="content">
+      <p class="text-muted">Loading…</p>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    requireAuth();
+    const user = getUser();
+    if (user) document.getElementById('userName').textContent = user.name;
+
+    async function loadMyTasks() {
+      try {
+        const data = await apiFetch('/dashboard/');
+        const allTasks = data.my_tasks;
+
+        if (!allTasks.length) {
+          document.getElementById('content').innerHTML = '<p class="text-muted">No open tasks assigned to you.</p>';
+          return;
+        }
+
+        // Group by project
+        const grouped = {};
+        allTasks.forEach(t => {
+          if (!grouped[t.project_id]) grouped[t.project_id] = { name: t.project_name, tasks: [] };
+          grouped[t.project_id].tasks.push(t);
+        });
+
+        document.getElementById('content').innerHTML = Object.entries(grouped).map(([pid, group]) => `
+          <div class="mb-4">
+            <h6 class="fw-bold border-bottom pb-2">
+              <a href="/project-detail?id=${pid}" class="text-dark text-decoration-none">${group.name}</a>
+            </h6>
+            <table class="table table-hover">
+              <thead><tr><th>Task</th><th>Priority</th><th>Status</th><th>Due Date</th></tr></thead>
+              <tbody>
+                ${group.tasks.map(t => {
+                  const today = new Date().toISOString().split('T')[0];
+                  const overdue = t.due_date && t.due_date < today && t.status !== 'done';
+                  return `<tr class="${overdue ? 'overdue-row' : ''}">
+                    <td>${t.title}</td>
+                    <td>${priorityBadge(t.priority)}</td>
+                    <td>
+                      <select class="form-select form-select-sm" style="width:130px"
+                        onchange="updateStatus('${pid}', '${t.id}', this.value)">
+                        <option value="todo" ${t.status==='todo'?'selected':''}>To Do</option>
+                        <option value="in_progress" ${t.status==='in_progress'?'selected':''}>In Progress</option>
+                        <option value="done" ${t.status==='done'?'selected':''}>Done</option>
+                      </select>
+                    </td>
+                    <td>${t.due_date || '–'}</td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>`).join('');
+      } catch (err) {
+        document.getElementById('content').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+      }
+    }
+
+    async function updateStatus(projectId, taskId, status) {
+      try {
+        await apiFetch(`/projects/${projectId}/tasks/${taskId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status }),
+        });
+        if (status === 'done') loadMyTasks();
+      } catch (err) {
+        alert(err.message);
+        loadMyTasks();
+      }
+    }
+
+    loadMyTasks();
+  </script>
+</body>
+</html>
