@@ -15,6 +15,24 @@ from app.auth.dependencies import get_current_user, get_project_membership, requ
 router = APIRouter()
 
 
+async def _validate_assignee(
+    project_id: uuid.UUID, assigned_to: uuid.UUID | None, db: AsyncSession
+) -> None:
+    if assigned_to is None:
+        return
+    result = await db.execute(
+        select(ProjectMember).where(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == assigned_to,
+        )
+    )
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Assigned user is not a member of this project",
+        )
+
+
 @router.get("/{project_id}/tasks/", response_model=list[TaskOut])
 async def list_tasks(
     project_id: uuid.UUID,
@@ -34,10 +52,11 @@ async def list_tasks(
 async def create_task(
     project_id: uuid.UUID,
     payload: TaskCreate,
-    membership: ProjectMember = Depends(require_project_admin),
+    membership: ProjectMember = Depends(get_project_membership),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    await _validate_assignee(project_id, payload.assigned_to, db)
     task = Task(
         project_id=project_id,
         title=payload.title,
@@ -94,10 +113,15 @@ async def update_task(
 
     if membership.role == MemberRole.member:
         if task.assigned_to != current_user.id:
-            raise HTTPException(status_code=403, detail="You can only update your own assigned tasks")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Members can only update their own assigned tasks",
+            )
         if payload.status is not None:
             task.status = payload.status
     else:
+        if payload.assigned_to is not None:
+            await _validate_assignee(project_id, payload.assigned_to, db)
         update_data = payload.model_dump(exclude_none=True)
         for field, value in update_data.items():
             setattr(task, field, value)

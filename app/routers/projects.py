@@ -12,7 +12,7 @@ from app.models.task import Task
 from app.models.enums import MemberRole
 from app.schemas.project import (
     ProjectCreate, ProjectUpdate, ProjectOut, ProjectDetail,
-    MemberOut, AddMemberRequest,
+    MemberOut, AddMemberRequest, UpdateMemberRoleRequest,
 )
 from app.auth.dependencies import get_current_user, get_project_membership, require_project_admin
 
@@ -167,6 +167,30 @@ async def add_member(
     db.add(new_member)
     await db.commit()
     return MemberOut(user_id=user.id, name=user.name, email=user.email, role=payload.role)
+
+
+@router.patch("/{project_id}/members/{user_id}", response_model=MemberOut)
+async def update_member_role(
+    project_id: uuid.UUID,
+    user_id: uuid.UUID,
+    payload: UpdateMemberRoleRequest,
+    membership: ProjectMember = Depends(require_project_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    if user_id == membership.user_id:
+        raise HTTPException(status_code=400, detail="Cannot change your own role")
+    result = await db.execute(
+        select(ProjectMember)
+        .where(ProjectMember.project_id == project_id, ProjectMember.user_id == user_id)
+        .options(selectinload(ProjectMember.user))
+    )
+    member = result.scalar_one_or_none()
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+    member.role = payload.role
+    await db.commit()
+    await db.refresh(member)
+    return MemberOut(user_id=member.user_id, name=member.user.name, email=member.user.email, role=member.role)
 
 
 @router.delete("/{project_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
